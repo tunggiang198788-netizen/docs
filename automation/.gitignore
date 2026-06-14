@@ -1,0 +1,11 @@
+.env
+service_account.json
+downloads/*
+!downloads/.gitkeep
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.DS_Store
