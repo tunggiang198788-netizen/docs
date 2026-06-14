@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from clients.drive_client import upload_all_videos
 from config.settings import Settings
 from pipeline.downloader import DownloadResult
@@ -17,7 +15,7 @@ def run(settings: Settings, keyword: str, results: list[DownloadResult]) -> str:
         return ""
 
     folder_url, _ = upload_all_videos(
-        service_account_json=settings.google_service_account_json,
+        settings=settings,
         local_paths=successful_paths,
         keyword=keyword,
         parent_folder_id=settings.google_drive_parent_folder_id,

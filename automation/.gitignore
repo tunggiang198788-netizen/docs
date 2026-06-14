@@ -1,5 +1,7 @@
 .env
 service_account.json
+client_secret.json
+token.json
 downloads/*
 !downloads/.gitkeep
 __pycache__/

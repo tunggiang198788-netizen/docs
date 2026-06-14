@@ -12,22 +12,22 @@ BATCH_SIZE = 10
 
 
 def _upload_and_wait(local_paths: list[Path]) -> list[str]:
-    active_uris: list[str] = []
+    active_names: list[str] = []
     for path in local_paths:
-        uri = gemini_client.upload_video(path)
-        if not uri:
+        name = gemini_client.upload_video(path)
+        if not name:
             continue
-        ok = gemini_client.wait_for_active(uri)
+        ok = gemini_client.wait_for_active(name)
         if ok:
-            active_uris.append(uri)
+            active_names.append(name)
         else:
             log.warning(f"[Analyzer] Skipping {path.name} (not ACTIVE)")
-    return active_uris
+    return active_names
 
 
-def _cleanup(uris: list[str]) -> None:
-    for uri in uris:
-        gemini_client.delete_file(uri)
+def _cleanup(names: list[str]) -> None:
+    for name in names:
+        gemini_client.delete_file(name)
 
 
 def run(
@@ -43,9 +43,10 @@ def run(
         estimate = gemini_client.estimate_cost(total, settings.gemini_model)
         log.info("[Step 5/6] DRY RUN — skipping Gemini analysis")
         log.info(
-            f"[Step 5/6] Cost estimate: {estimate['num_videos']} videos × "
-            f"~{estimate['estimated_input_tokens']:,} tokens → "
-            f"~${estimate['estimated_cost_usd']:.2f} USD "
+            f"[Step 5/6] Cost estimate: {estimate['num_videos']} videos x "
+            f"~{estimate['tokens_per_video']:,} tokens/video x "
+            f"~{estimate['estimated_input_tokens']:,} total tokens -> "
+            f"~${estimate['estimated_cost_usd']:.4f} USD "
             f"(model: {settings.gemini_model})"
         )
         return "[DRY RUN — no analysis performed]"
@@ -60,28 +61,28 @@ def run(
     all_paths = [r.local_path for r in successful]
     batches = [all_paths[i:i + BATCH_SIZE] for i in range(0, len(all_paths), BATCH_SIZE)]
 
-    all_uris: list[str] = []
-    batch_uris: list[list[str]] = []
+    all_names: list[str] = []
+    batch_names: list[list[str]] = []
 
     for i, batch_paths in enumerate(batches):
         log.info(f"[Step 5/6] Uploading batch {i+1}/{len(batches)} ({len(batch_paths)} videos)...")
-        uris = _upload_and_wait(batch_paths)
-        batch_uris.append(uris)
-        all_uris.extend(uris)
+        names = _upload_and_wait(batch_paths)
+        batch_names.append(names)
+        all_names.extend(names)
 
     try:
         preliminary_notes: list[str] = []
-        for i, (uris, batch_paths) in enumerate(zip(batch_uris, batches)):
-            if not uris:
+        for i, (names, batch_paths) in enumerate(zip(batch_names, batches)):
+            if not names:
                 preliminary_notes.append(f"[Batch {i+1} had no uploadable videos]")
                 continue
             start = i * BATCH_SIZE + 1
             end = start + len(batch_paths) - 1
             prompt = get_preliminary_prompt(
-                keyword=keyword, count=len(uris), start=start, end=end, total=total
+                keyword=keyword, count=len(names), start=start, end=end, total=total
             )
             log.info(f"[Step 5/6] Preliminary analysis batch {i+1}/{len(batches)}...")
-            notes = gemini_client.analyze_batch(settings.gemini_model, uris, prompt)
+            notes = gemini_client.analyze_batch(settings.gemini_model, names, prompt)
             preliminary_notes.append(notes)
             log.info(f"[Step 5/6] Batch {i+1} notes: {len(notes)} chars")
 
@@ -101,4 +102,4 @@ def run(
         return final_analysis
 
     finally:
-        _cleanup(all_uris)
+        _cleanup(all_names)

@@ -13,7 +13,7 @@ def run(settings: Settings, keyword: str, analysis_text: str) -> str:
         return ""
 
     url = write_analysis(
-        service_account_json=settings.google_service_account_json,
+        settings=settings,
         keyword=keyword,
         analysis_text=analysis_text,
     )

@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 import gspread
-from google.oauth2.service_account import Credentials
 
+from clients.auth import get_credentials, is_service_account
 from utils.logger import log
-
-SCOPES = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive",
-]
 
 HEADERS = [
     "STT", "Video ID", "URL", "Luot xem", "Luot thich",
@@ -16,13 +11,21 @@ HEADERS = [
 ]
 
 
-def _get_client(service_account_json: str) -> gspread.Client:
-    creds = Credentials.from_service_account_file(service_account_json, scopes=SCOPES)
+def _get_client(settings) -> gspread.Client:
+    creds = get_credentials(settings)
     return gspread.authorize(creds)
 
 
-def create_or_open_sheet(service_account_json: str, keyword: str) -> tuple[gspread.Spreadsheet, str]:
-    gc = _get_client(service_account_json)
+def _share_if_needed(settings, spreadsheet: gspread.Spreadsheet) -> None:
+    creds = get_credentials(settings)
+    if not is_service_account(creds) or not settings.user_email:
+        return
+    spreadsheet.share(settings.user_email, perm_type="user", role="writer", notify=False)
+    log.info(f"[Sheets] Shared with {settings.user_email}")
+
+
+def create_or_open_sheet(settings, keyword: str) -> tuple[gspread.Spreadsheet, str]:
+    gc = _get_client(settings)
     title = f"{keyword} - Bang chi so tuong tac Top 30"
 
     try:
@@ -30,18 +33,19 @@ def create_or_open_sheet(service_account_json: str, keyword: str) -> tuple[gspre
         log.info(f"[Sheets] Opened existing spreadsheet: {title}")
     except gspread.SpreadsheetNotFound:
         spreadsheet = gc.create(title)
+        _share_if_needed(settings, spreadsheet)
         log.info(f"[Sheets] Created new spreadsheet: {title}")
 
     return spreadsheet, spreadsheet.url
 
 
 def write_video_metadata(
-    service_account_json: str,
+    settings,
     keyword: str,
     videos: list,
     local_paths: dict[int, str] | None = None,
 ) -> str:
-    spreadsheet, url = create_or_open_sheet(service_account_json, keyword)
+    spreadsheet, url = create_or_open_sheet(settings, keyword)
     ws = spreadsheet.sheet1
     ws.clear()
     ws.append_row(HEADERS)
@@ -65,5 +69,5 @@ def write_video_metadata(
     if rows:
         ws.append_rows(rows)
 
-    log.info(f"[Sheets] Wrote {len(rows)} rows → {url}")
+    log.info(f"[Sheets] Wrote {len(rows)} rows -> {url}")
     return url

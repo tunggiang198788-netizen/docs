@@ -14,7 +14,7 @@ def run(
 ) -> str:
     log.info(f"[Step 2/6] Logging {len(videos)} videos to Google Sheets")
     url = write_video_metadata(
-        service_account_json=settings.google_service_account_json,
+        settings=settings,
         keyword=keyword,
         videos=videos,
         local_paths=local_paths,

@@ -21,9 +21,16 @@ class VideoMeta:
 
 
 def _extract_download_url(item: dict) -> str:
-    for field in ("downloadUrlNoWatermark", "videoUrlNoWatermark", "downloadUrl", "videoUrl"):
-        if item.get(field):
-            return item[field]
+    video_meta = item.get("videoMeta", {})
+    if isinstance(video_meta, dict):
+        for field in ("downloadAddr", "originalDownloadAddr"):
+            url = video_meta.get(field)
+            if url:
+                return url
+    for field in ("videoUrl", "downloadUrl"):
+        url = item.get(field)
+        if url:
+            return url
     return ""
 
 
@@ -50,8 +57,7 @@ def fetch_top_videos(api_token: str, actor_id: str, keyword: str, limit: int) ->
 
     run_input: dict = {
         "searchQueries": [keyword],
-        "maxItems": limit,
-        "resultsType": "videos",
+        "resultsPerPage": limit,
     }
 
     actor_call = client.actor(actor_id).call(run_input=run_input)
@@ -82,7 +88,6 @@ def fetch_top_videos(api_token: str, actor_id: str, keyword: str, limit: int) ->
     videos.sort(key=lambda v: v.view_count, reverse=True)
     videos = videos[:limit]
     for i, v in enumerate(videos):
-        object.__setattr__(v, "rank", i + 1) if hasattr(v, "__dataclass_fields__") else None
         videos[i] = VideoMeta(
             rank=i + 1,
             video_id=v.video_id,
